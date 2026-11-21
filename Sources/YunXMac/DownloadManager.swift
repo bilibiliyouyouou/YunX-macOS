@@ -40,20 +40,33 @@ final class DownloadManager: NSObject, ObservableObject {
 
     func addDirectDownload(_ rawValue: String) throws {
         guard let url = URL(string: rawValue.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let scheme = url.scheme?.lowercased(),
-              ["https", "http"].contains(scheme),
+              url.scheme?.lowercased() == "https",
               url.host != nil else {
             throw DownloadError.invalidURL
         }
         guard LinkClassifier.classify(url) == .directDownload else {
             throw DownloadError.shareLink
         }
+        try addResolvedDownload(url: url, fileName: LinkClassifier.safeFileName(from: url), headers: [:])
+    }
 
+    func addResolvedDownload(url: URL, fileName: String, headers: [String: String], protectSourceURL: Bool = false) throws {
+        guard url.scheme?.lowercased() == "https", url.host != nil else {
+            throw DownloadError.invalidURL
+        }
         let job = DownloadJob(
             sourceURL: url,
-            fileName: LinkClassifier.safeFileName(from: url),
-            destinationPath: downloadFolder.path
+            fileName: fileName,
+            destinationPath: downloadFolder.path,
+            protectSourceURL: protectSourceURL
         )
+        if !headers.isEmpty || protectSourceURL {
+            do {
+                try DownloadHeaderVault.save(headers, sourceURL: protectSourceURL ? url.absoluteString : nil, for: job.id)
+            } catch {
+                throw DownloadError.credentialStorage(error.localizedDescription)
+            }
+        }
         jobs.insert(job, at: 0)
         persistJobs()
         start(jobID: job.id)
@@ -61,12 +74,16 @@ final class DownloadManager: NSObject, ObservableObject {
 
     func pause(_ job: DownloadJob) {
         guard let task = tasks[job.id] else { return }
+        let headers = DownloadHeaderVault.headers(for: job.id)
+        let canPersistResumeData = !DownloadHeaderVault.hasSensitiveHeaders(headers)
+            && !DownloadHeaderVault.hasProtectedSourceURL(for: job.id)
         task.cancel(byProducingResumeData: { [weak self] data in
             Task { @MainActor in
                 guard let self else { return }
                 self.tasks.removeValue(forKey: job.id)
                 self.update(job.id) {
-                    $0.resumeData = data
+                    // URLSession 恢复数据可能包含请求头；Cookie/Auth 绝不写入 downloads.json。
+                    $0.resumeData = canPersistResumeData ? data : nil
                     $0.status = .paused
                     $0.errorMessage = nil
                 }
@@ -81,13 +98,19 @@ final class DownloadManager: NSObject, ObservableObject {
 
     func remove(_ job: DownloadJob) {
         tasks.removeValue(forKey: job.id)?.cancel()
+        DownloadHeaderVault.remove(for: job.id)
         jobs.removeAll { $0.id == job.id }
         persistJobs()
     }
 
     private func start(jobID: UUID) {
-        guard let index = jobs.firstIndex(where: { $0.id == jobID }),
-              let url = URL(string: jobs[index].sourceURL) else { return }
+        guard let index = jobs.firstIndex(where: { $0.id == jobID }) else { return }
+        let storedURL = DownloadHeaderVault.sourceURL(for: jobID) ?? jobs[index].sourceURL
+        guard let url = URL(string: storedURL),
+              url.scheme?.lowercased() == "https", url.host != nil else {
+            markFailed(jobID, message: "下载地址无效或不是 HTTPS。请重新解析分享链接。")
+            return
+        }
 
         let resumeData = jobs[index].resumeData
         jobs[index].resumeData = nil
@@ -100,11 +123,18 @@ final class DownloadManager: NSObject, ObservableObject {
         }
         persistJobs()
 
+        let headers = DownloadHeaderVault.headers(for: jobID)
         let task: URLSessionDownloadTask
-        if let resumeData {
+        if let resumeData,
+           !DownloadHeaderVault.hasSensitiveHeaders(headers),
+           !DownloadHeaderVault.hasProtectedSourceURL(for: jobID) {
             task = session.downloadTask(withResumeData: resumeData)
         } else {
-            task = session.downloadTask(with: url)
+            var request = URLRequest(url: url)
+            for (name, value) in headers {
+                request.setValue(value, forHTTPHeaderField: name)
+            }
+            task = session.downloadTask(with: request)
         }
         task.taskDescription = jobID.uuidString
         tasks[jobID] = task
@@ -155,6 +185,7 @@ final class DownloadManager: NSObject, ObservableObject {
             let target = uniqueDestination(in: folder, fileName: preferred)
             try FileManager.default.moveItem(at: stagedFile, to: target)
             tasks.removeValue(forKey: id)
+            DownloadHeaderVault.remove(for: id)
             update(id) {
                 $0.fileName = target.lastPathComponent
                 $0.status = .completed
@@ -215,18 +246,53 @@ final class DownloadManager: NSObject, ObservableObject {
 private enum DownloadError: LocalizedError {
     case invalidURL
     case shareLink
+    case credentialStorage(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            "请输入有效的 HTTP 或 HTTPS 下载地址。"
+            "请输入有效的 HTTPS 下载地址。"
         case .shareLink:
-            "这是网盘或内容平台分享链接。平台解析功能尚未移植；请先粘贴解析后的直链。"
+            "分享链接需先在对应平台完成解析，再将下载直链加入队列。"
+        case let .credentialStorage(message):
+            "无法安全保存下载凭证：\(message)"
         }
     }
 }
 
 extension DownloadManager: URLSessionDownloadDelegate {
+    nonisolated func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        guard let destinationURL = request.url,
+              destinationURL.scheme?.lowercased() == "https" else {
+            completionHandler(nil)
+            return
+        }
+
+        var safeRequest = request
+        let sourceURL = task.currentRequest?.url ?? task.originalRequest?.url
+        let sourceOrigin = sourceURL.map(Self.originKey)
+        let destinationOrigin = Self.originKey(destinationURL)
+        if sourceOrigin != destinationOrigin {
+            safeRequest.setValue(nil, forHTTPHeaderField: "Cookie")
+            safeRequest.setValue(nil, forHTTPHeaderField: "Authorization")
+            safeRequest.setValue(nil, forHTTPHeaderField: "Proxy-Authorization")
+        }
+        completionHandler(safeRequest)
+    }
+
+    private nonisolated static func originKey(_ url: URL) -> String {
+        let scheme = url.scheme?.lowercased() ?? ""
+        let host = url.host?.lowercased() ?? ""
+        let port = url.port ?? (scheme == "https" ? 443 : 80)
+        return "\(scheme)://\(host):\(port)"
+    }
+
     nonisolated func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,

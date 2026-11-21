@@ -3,7 +3,8 @@ import AppKit
 import SwiftUI
 
 private enum AppSection: String, CaseIterable, Identifiable {
-    case resolve = "解析下载"
+    case cloudDrives = "网盘分享"
+    case resolve = "直链下载"
     case downloads = "下载管理"
     case about = "关于 YunX"
 
@@ -11,6 +12,7 @@ private enum AppSection: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .cloudDrives: "externaldrive.badge.person.crop"
         case .resolve: "link"
         case .downloads: "arrow.down.circle"
         case .about: "info.circle"
@@ -38,7 +40,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("macOS 移植进行中")
                         .font(.caption.weight(.semibold))
-                    Text("当前版本支持 HTTP(S) 直链下载")
+                    Text("夸克网盘分享 + HTTPS 直链")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -47,7 +49,9 @@ struct ContentView: View {
             }
         } detail: {
             Group {
-                switch selection ?? .resolve {
+                switch selection ?? .cloudDrives {
+                case .cloudDrives:
+                    QuarkDriveView()
                 case .resolve:
                     ResolverView()
                 case .downloads:
@@ -122,12 +126,16 @@ private struct ResolverView: View {
                         Label("识别到\(name)分享链接", systemImage: "sparkle.magnifyingglass")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.orange)
-                        Text("此 macOS 移植版尚未迁移该平台的登录与解析接口。为避免把分享网页错误地保存成文件，请先使用原版解析出下载直链。")
+                        Text(name == "夸克网盘" ? "夸克分享解析已移植。请在侧边栏打开“网盘分享”，浏览文件并加入下载队列。" : "此 macOS 移植版尚未迁移该平台的登录与解析接口。为避免把分享网页错误地保存成文件，请先使用原版解析出下载直链。")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                    } else if parsedURL?.scheme?.lowercased() == "http" {
+                        Label("出于安全考虑，仅支持 HTTPS 下载地址", systemImage: "lock.fill")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.orange)
                     } else {
-                        Label("支持 HTTP / HTTPS 文件直链", systemImage: "checkmark.circle.fill")
+                        Label("支持 HTTPS 文件直链", systemImage: "checkmark.circle.fill")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.green)
                     }
@@ -202,8 +210,8 @@ private struct ResolverView: View {
     }
 
     private var canStart: Bool {
-        guard let url = parsedURL, url.host != nil else { return false }
-        guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme) else { return false }
+        guard let url = parsedURL, url.host != nil,
+              url.scheme?.lowercased() == "https" else { return false }
         return classification == .directDownload
     }
 
@@ -258,7 +266,7 @@ private struct DownloadsView: View {
                         .foregroundStyle(.secondary)
                     Text("暂无下载任务")
                         .font(.title3.weight(.semibold))
-                    Text("在“解析下载”中粘贴 HTTP 或 HTTPS 文件直链。")
+                    Text("在“直链下载”中粘贴 HTTPS 文件直链。")
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -401,7 +409,7 @@ private struct AboutView: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("关于云析 YunX")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
-            Text("YunX macOS 是基于 CYQawa/YunX Android 项目开展的原生 SwiftUI 移植。当前开发版本提供 HTTP(S) 直链下载、下载队列、暂停/继续、任务状态本机持久化与 Finder 定位。")
+            Text("YunX macOS 是基于 CYQawa/YunX Android 项目开展的原生 SwiftUI 移植。当前开发版本提供 HTTPS 直链下载、夸克网盘分享下载、下载队列、暂停/继续、任务状态本机持久化与 Finder 定位。")
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
             Text("平台解析与登录等功能仍在迁移中；此版本不是 Android 版的完整替代品。项目仍遵循 GNU AGPL-3.0，完整协议见仓库根目录 LICENSE。")

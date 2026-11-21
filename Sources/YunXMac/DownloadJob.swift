@@ -32,9 +32,9 @@ struct DownloadJob: Identifiable, Codable, Equatable {
     var errorMessage: String?
     var resumeData: Data?
 
-    init(sourceURL: URL, fileName: String, destinationPath: String) {
+    init(sourceURL: URL, fileName: String, destinationPath: String, protectSourceURL: Bool = false) {
         self.id = UUID()
-        self.sourceURL = sourceURL.absoluteString
+        self.sourceURL = protectSourceURL ? "夸克网盘直链（已安全保存在钥匙串）" : sourceURL.absoluteString
         self.fileName = fileName
         self.destinationPath = destinationPath
         self.status = .queued

@@ -1,3 +1,6 @@
+# macOS metadata
+.DS_Store
+
 # Android / Swift 构建输出
 /build/
 /.build/

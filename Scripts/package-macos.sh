@@ -13,6 +13,9 @@ swiftc -swift-version 5 -O \
     -o "$BUILD_DIR/YunXMac" \
     "$ROOT_DIR/Sources/YunXMac/DownloadJob.swift" \
     "$ROOT_DIR/Sources/YunXMac/LinkClassifier.swift" \
+    "$ROOT_DIR/Sources/YunXMac/KeychainStore.swift" \
+    "$ROOT_DIR/Sources/YunXMac/QuarkAPI.swift" \
+    "$ROOT_DIR/Sources/YunXMac/QuarkDriveView.swift" \
     "$ROOT_DIR/Sources/YunXMac/DownloadManager.swift" \
     "$ROOT_DIR/Sources/YunXMac/ContentView.swift" \
     "$ROOT_DIR/Sources/YunXMac/YunXMacApp.swift"
