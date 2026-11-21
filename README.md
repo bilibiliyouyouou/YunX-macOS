@@ -23,6 +23,16 @@
 
 ***
 
+## macOS 原生移植（开发中）
+
+本仓库在保留 Android 上游代码与 AGPL-3.0 许可的基础上，新增了一个 SwiftUI macOS 客户端。当前版本支持 HTTP/HTTPS 直链下载与基础任务管理；网盘登录、分享解析、视频/图集解析与预览等功能尚未完成移植，因此暂不能替代 Android 版。
+
+- [macOS 移植状态、功能边界与构建说明](./macOS-PORT.md)
+- 快速构建：`swift run YunXMac`
+- 生成未签名 `.app`：`bash Scripts/package-macos.sh`
+
+此移植独立于 README 下方提及的 `tidain/YunX-Desktop` Windows 桌面版；不会修改或代替其仓库。
+
 > **云析永远免费开源。** 如果你是在任何地方"花钱买到"的，说明你被骗了，请立即退款。
 > 任何收费版本均为二次打包的诈骗版本，与本项目无关。
 

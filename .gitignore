@@ -1,5 +1,7 @@
-# Android 构建输出
+# Android / Swift 构建输出
 /build/
+/.build/
+/macos-build/
 /.kotlin/
 /app/build/
 /captures
