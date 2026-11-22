@@ -3,7 +3,8 @@ import AppKit
 import SwiftUI
 
 private enum AppSection: String, CaseIterable, Identifiable {
-    case cloudDrives = "网盘分享"
+    case cloudDrives = "夸克网盘"
+    case ucDrive = "UC 网盘"
     case resolve = "直链下载"
     case downloads = "下载管理"
     case about = "关于 YunX"
@@ -12,7 +13,7 @@ private enum AppSection: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .cloudDrives: "externaldrive.badge.person.crop"
+        case .cloudDrives, .ucDrive: "externaldrive.badge.person.crop"
         case .resolve: "link"
         case .downloads: "arrow.down.circle"
         case .about: "info.circle"
@@ -40,7 +41,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("macOS 移植进行中")
                         .font(.caption.weight(.semibold))
-                    Text("夸克网盘分享 + HTTPS 直链")
+                    Text("夸克、UC 网盘分享 + HTTPS 直链")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -52,6 +53,8 @@ struct ContentView: View {
                 switch selection ?? .cloudDrives {
                 case .cloudDrives:
                     QuarkDriveView()
+                case .ucDrive:
+                    UCDriveView()
                 case .resolve:
                     ResolverView()
                 case .downloads:
@@ -126,7 +129,7 @@ private struct ResolverView: View {
                         Label("识别到\(name)分享链接", systemImage: "sparkle.magnifyingglass")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.orange)
-                        Text(name == "夸克网盘" ? "夸克分享解析已移植。请在侧边栏打开“网盘分享”，浏览文件并加入下载队列。" : "此 macOS 移植版尚未迁移该平台的登录与解析接口。为避免把分享网页错误地保存成文件，请先使用原版解析出下载直链。")
+                        Text(name == "夸克网盘" ? "夸克分享解析已移植。请在侧边栏打开“夸克网盘”，浏览文件并加入下载队列。" : name == "UC 网盘" ? "UC 分享解析已移植。请在侧边栏打开“UC 网盘”，浏览文件并加入下载队列。" : "此 macOS 移植版尚未迁移该平台的登录与解析接口。为避免把分享网页错误地保存成文件，请先使用原版解析出下载直链。")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -409,7 +412,7 @@ private struct AboutView: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("关于云析 YunX")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
-            Text("YunX macOS 是基于 CYQawa/YunX Android 项目开展的原生 SwiftUI 移植。当前开发版本提供 HTTPS 直链下载、夸克网盘分享下载、下载队列、暂停/继续、任务状态本机持久化与 Finder 定位。")
+            Text("YunX macOS 是基于 CYQawa/YunX Android 项目开展的原生 SwiftUI 移植。当前开发版本提供 HTTPS 直链下载、夸克与 UC 网盘分享下载、下载队列、暂停/继续、任务状态本机持久化与 Finder 定位。")
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
             Text("平台解析与登录等功能仍在迁移中；此版本不是 Android 版的完整替代品。项目仍遵循 GNU AGPL-3.0，完整协议见仓库根目录 LICENSE。")

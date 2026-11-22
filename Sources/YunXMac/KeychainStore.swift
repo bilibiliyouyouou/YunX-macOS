@@ -112,6 +112,62 @@ private enum CredentialError: LocalizedError {
     }
 }
 
+@MainActor
+final class UCCredentialStore: ObservableObject {
+    static let shared = UCCredentialStore()
+    private static let accountKey = "uc-account-cookie"
+
+    @Published private(set) var isSignedIn: Bool
+
+    private init() {
+        isSignedIn = YunXKeychain.load(account: Self.accountKey) != nil
+    }
+
+    func cookie() -> String? {
+        guard let data = YunXKeychain.load(account: Self.accountKey),
+              let value = String(data: data, encoding: .utf8),
+              Self.isValid(value) else { return nil }
+        return value
+    }
+
+    func save(cookie: String) throws {
+        let trimmed = cookie.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Self.isValid(trimmed) else { throw UCCredentialError.invalidCookie }
+        guard let data = trimmed.data(using: .utf8) else { throw UCCredentialError.encoding }
+        try YunXKeychain.save(data, account: Self.accountKey)
+        isSignedIn = true
+    }
+
+    func clear() {
+        YunXKeychain.delete(account: Self.accountKey)
+        isSignedIn = false
+    }
+
+    private static func isValid(_ cookie: String) -> Bool {
+        var values: [String: String] = [:]
+        for part in cookie.split(separator: ";") {
+            let pair = part.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pair.count == 2 else { continue }
+            values[String(pair[0])] = String(pair[1])
+        }
+        return !(values["__pus"] ?? "").isEmpty && !(values["__puus"] ?? "").isEmpty
+    }
+}
+
+private enum UCCredentialError: LocalizedError {
+    case invalidCookie
+    case encoding
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidCookie:
+            "Cookie 缺少 UC 登录所需的 __pus 或 __puus 字段。请在 UC 网盘完成登录后再保存。"
+        case .encoding:
+            "无法编码 UC 登录凭证。"
+        }
+    }
+}
+
 enum DownloadHeaderVault {
     private static func key(_ id: UUID) -> String { "download-secrets-\(id.uuidString)" }
 

@@ -16,6 +16,8 @@ swiftc -swift-version 5 -O \
     "$ROOT_DIR/Sources/YunXMac/KeychainStore.swift" \
     "$ROOT_DIR/Sources/YunXMac/QuarkAPI.swift" \
     "$ROOT_DIR/Sources/YunXMac/QuarkDriveView.swift" \
+    "$ROOT_DIR/Sources/YunXMac/UCAPI.swift" \
+    "$ROOT_DIR/Sources/YunXMac/UCDriveView.swift" \
     "$ROOT_DIR/Sources/YunXMac/DownloadManager.swift" \
     "$ROOT_DIR/Sources/YunXMac/ContentView.swift" \
     "$ROOT_DIR/Sources/YunXMac/YunXMacApp.swift"

@@ -34,7 +34,7 @@ struct DownloadJob: Identifiable, Codable, Equatable {
 
     init(sourceURL: URL, fileName: String, destinationPath: String, protectSourceURL: Bool = false) {
         self.id = UUID()
-        self.sourceURL = protectSourceURL ? "夸克网盘直链（已安全保存在钥匙串）" : sourceURL.absoluteString
+        self.sourceURL = protectSourceURL ? "网盘签名直链（已安全保存在钥匙串）" : sourceURL.absoluteString
         self.fileName = fileName
         self.destinationPath = destinationPath
         self.status = .queued
